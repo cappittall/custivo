@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR Ring Project</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <video id="video" width="540" height="720" autoplay playsinline style="position: absolute; top: 0; left: 0;"></video>
+
+    <script src="./WRRH/libs/three/v131/build/three.js" defer></script>
+    <script src="./WRRH/libs/three/v131/examples/js/loaders/GLTFLoader.js" defer></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands" ></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils"></script>
+    <script type="module" src="static/js/main4.js" ></script>
+</body>
+</html>

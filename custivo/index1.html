@@ -1,0 +1,216 @@
+<!doctype html>
+    <head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+    content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="static/img/favicon.svg">
+    <title>Custivo Visual Studio !</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <!-- three.js -->
+    <script src="https://unpkg.com/three@0.126.0/build/three.js"></script>
+    <script src="https://unpkg.com/three@0.126.0/examples/js/loaders/GLTFLoader.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        #my-video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform: rotateY(180deg);
+            -webkit-transform:rotateY(180deg); /* Safari and Chrome */
+            -moz-transform:rotateY(180deg); /* Firefox */
+            z-index: 0;
+        }
+        #my-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100%;
+            z-index: 10;
+        }
+        #ren-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100%;
+            z-index: 11;
+        }
+    </style>
+    </head>
+
+    <body>
+    <button onclick="switchCamera()"> Kamerayı değiştir.</button>
+    <video id="my-video" muted ></video>
+    <canvas id="my-canvas" ></canvas>
+    <canvas id="ren-canvas" ></canvas>
+
+
+    <script>
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    // switchCamera 
+    let currentStream;
+    let front = false;
+    async function switchCamera() {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+    
+      const constraints = {
+        video: {
+          facingMode: front ? "user" : "environment"
+        }
+      };
+    
+      currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+      document.querySelector("video").srcObject = currentStream;
+      front = !front;
+    }
+    /// END     
+    
+    function setFullScreen(cv){
+        const pixelRatio = window.devicePixelRatio || 1;
+        cv.width = pixelRatio * width;
+        cv.height = pixelRatio * height;
+      }
+    function main() {
+        
+
+        const videoElement = document.getElementById("my-video");
+        const canvasElement = document.getElementById("my-canvas");
+        const renCanvasElement = document.getElementById("ren-canvas");
+
+        setFullScreen(canvasElement);
+        setFullScreen(renCanvasElement);
+       
+
+        const gl = canvasElement.getContext("webgl", {xrCompatible: true});
+        const ctx = renCanvasElement.getContext("2d");
+
+        var midpoint = new THREE.Vector3();
+        let vec = new THREE.Vector3()
+        let pos = new THREE.Vector3()
+
+        const onResults= (results)=> {
+        if (results.multiHandLandmarks.length > 0) {
+            const landmarks = results.multiHandLandmarks[0];
+            const info = results.multiHandedness[0];
+            yuzuk.visible = true;
+            console.log("results.keys > 0", results)
+            console.log("CAMERA : front:",  front,'\ncurrentStream', currentStream)
+            const rf13 = landmarks[13];
+            const rf14 = landmarks[14];
+            ctx.clearRect(0, 0, width, height);
+            ctx.fillStyle = "#1eff00";
+            ctx.font = "30px Arial";
+            ctx.fillRect(rf13.x*width, rf13.y*height, rf14.x*width,rf14.y*height);
+            ctx.fillText(info.label, 0, 20 );
+
+
+        }
+         else {
+            yuzuk.visible = true;
+        }; 
+    };
+    const hands = new Hands({locateFile: (file) => {
+    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+    }});
+    
+    hands.setOptions({
+        maxNumHands: 1,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+        });
+        // Connect to MediaPipe hand tracking
+    hands.onResults(onResults);
+    const myCamera = new Camera(videoElement, {     
+        onFrame: async () => {
+            await hands.send({image: videoElement});
+            await render();
+        }});
+    myCamera.start();
+    
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera( 45, width / height, 0.1, 10 );
+    camera.position.set( 0, 0, -5 );
+
+
+    camera.matrixAutoUpdate = false;
+
+    const light = new THREE.DirectionalLight( 0xffffff, 1 );
+    light.position.set( 0, 0, 1 );
+    scene.add( light );
+
+    const gltfLoader = new THREE.GLTFLoader();
+    let yuzuk;
+    gltfLoader.load( "static/glbs/yuzuk/Yuzuk.glb", function( gltf ) {
+        yuzuk= gltf.scene;
+        yuzuk.scale.set(0.1, 0.1, 0.1);
+        yuzuk.position.set(0, 0, -5);        //yuzuk.rotateX(Math.PI/2);
+        scene.add( yuzuk );
+
+    }, undefined, function( error ) {
+        console.error( 'Error oldu ', error );
+    } );
+    
+
+    const renderer = new THREE.WebGLRenderer( { canvas: canvasElement, context:gl, antialias: true, alpha: true } );       // alpha = true -> alpha = 0
+    renderer.setPixelRatio( window.devicePixelRatio );
+    renderer.setSize( width, height );
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.xr.enabled = true;
+
+
+    document.body.appendChild( renderer.domElement );
+    function render() {
+        renderer.render( scene, camera );
+        // requestAnimationFrame( render );
+    }
+
+    requestAnimationFrame( render );
+
+};
+
+main();
+
+</script>
+</body>
+</html>
+
+<!--
+
+
+      // Get the 3D position of the tip and base of the ring finger
+            landmarks = results.multiHandLandmarks[0]
+            const landmark18 = landmarks[18];
+            const landmark19 = landmarks[19];
+            const landmark20 = landmarks[20];
+            a=landmark18.x;
+            b=landmark18.y;
+            bx=landmark19.x;
+            by=landmark19.y;
+            vec.set ( a * 2 - 1,  -((b + by)/2) * 2 + 1, .5 );
+            vec.unproject(camera);
+            vec.sub(camera.position).normalize();
+            let distance = -camera.position.z / vec.z;
+
+            pos.copy(camera.position).add(vec.multiplyScalar(distance));
+            yuzuk.position.set(pos.x, pos.y, pos.z);
+
+            console.log('Açı : ', yuzuk.position);
+        
+        -->

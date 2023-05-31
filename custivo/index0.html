@@ -1,0 +1,321 @@
+<!doctype html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport"
+content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+<link rel="icon" type="image/x-icon" href="assets/img/favicon.svg">
+<title>Custivo Visual Studio !</title>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+<!-- Include the necessary script tags -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+
+<!-- Include the necessary script tags -->
+<script src="https://cdn.jsdelivr.net/npm/three"></script>
+<script src="https://cdn.jsdelivr.net/npm/three/examples/js/loaders/GLTFLoader.js"></script>
+<style>
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+label, span {
+    color:red;
+    font-weight: bold;
+}
+input {
+    width: 80%;
+    /*center the button*/
+    margin-left: auto;
+}
+
+</style>
+</head>
+<body>
+    
+    <input type="button" id="activate-xr" value="Activate XR" onclick="activateXR()">
+
+   <div id="overlay">
+        <div>
+		<label id="label" for="select-option">Option:</label>
+		<select id="select-option">
+			<option value="scale">Scale</option>
+			<option value="rotation">Rotation</option>
+			<option value="position">Position</option>
+		</select>
+        </div>
+        <br>
+        <div>
+            <label for="x-slider">X:</label>
+            <input type="range" id="x-slider" min="-10" max="10" step=".1">
+            <span id="x-slider-value"></span>
+        </div><br>
+        <div>
+            <label for="y-slider">Y:</label>
+            <input type="range" id="y-slider" min="-10" max="10" step=".1">
+            <span id="y-slider-value"></span>
+        </div><br>
+        <div>
+            <label for="z-slider">Z:</label>
+            <input type="range" id="z-slider" min="-10" max="10" step=".1">
+            <span id="z-slider-value"></span>
+        </div>
+    </div>
+<!-- Initialize the Hands object -->
+<script>
+    // Global variables
+    let handglb=null;
+    let soption="scale";
+    // get input elements changes
+    const xSlider = document.getElementById('x-slider');
+    const xValue = document.getElementById('x-slider-value');
+    const ySlider = document.getElementById('y-slider');
+    const yValue = document.getElementById('y-slider-value');
+    const zSlider = document.getElementById('z-slider');
+    const zValue = document.getElementById('z-slider-value');
+
+    function onResults(results) {
+        if (results.multiHandLandmarks.length > 0) {
+            landmarks = results.multiHandLandmarks[0];
+            if (landmarks) {
+                // animateHandGLB(landmarks);
+            }
+        }
+    }
+
+    const hands = new Hands({locateFile: (file) => {
+        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+    }});
+
+    hands.setOptions({
+        maxNumHands: 1,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+        });
+    // Connect to MediaPipe hand tracking
+    hands.onResults(onResults);
+
+    // Start the camera
+    /* 
+    const cam = new Camera(videoElement, {
+            onFrame: async () => {
+                await hands.send({image: videoElement});
+            
+            },
+            width: width,
+            height: height
+            });
+        
+        //Start the camera
+        cam.start();
+        */
+    
+   
+
+
+
+
+    // Mapping the landmarks points to the hand joints
+    const jointMapping = {
+            0: 'WRIST',
+            1: 'THUMB_CMC',
+            2: 'THUMB_MCP',
+            3: 'THUMB_IP',
+            4: 'THUMB_TIP',
+            5: 'INDEX_FINGER_MCP',
+            6: 'INDEX_FINGER_PIP',
+            7: 'INDEX_FINGER_DIP',
+            8: 'INDEX_FINGER_TIP',
+            9: 'MIDDLE_FINGER_MCP',
+            10: 'MIDDLE_FINGER_PIP',
+            11: 'MIDDLE_FINGER_DIP',
+            12: 'MIDDLE_FINGER_TIP',
+            13: 'RING_FINGER_MCP',
+            14: 'RING_FINGER_PIP',
+            15: 'RING_FINGER_DIP',
+            16: 'RING_FINGER_TIP',
+            17: 'PINKY_MCP',
+            18: 'PINKY_PIP',
+            19: 'PINKY_DIP',
+            20: 'PINKY_TIP'
+    };
+    
+    function reConfigureSlider(soption, scl, rot, pos){
+        val = soption=="scale"?scl:soption=="rotation"?rot:pos;
+        xValue.innerHTML = xSlider.value = val.x;
+        yValue.innerHTML = ySlider.value = val.y;
+        zValue.innerHTML = zSlider.value = val.z;
+    }
+       
+    async function activateXR() {
+        // Add a canvas element and initialize a WebGL context that is compatible with WebXR.
+        const canvas = document.createElement("canvas");
+        document.body.appendChild(canvas);
+        const gl = canvas.getContext("webgl2", {xrCompatible: true});
+   
+        // Initialize a WebXR session using "immersive-ar".
+        const session = await navigator.xr.requestSession("immersive-ar", {
+            requiredFeatures: ["hit-test"], 
+            optionalFeatures: ["dom-overlay", "hand-tracking"],
+            domOverlay: {
+                root: document.getElementById("overlay"),
+                },
+        });
+
+
+        const scene = new THREE.Scene();
+        const loader = new THREE.GLTFLoader();
+
+        await loader.load('assets/glbs/hand.glb', (gltf) => {
+            console.log('hand scene: ',gltf.scene);
+            handglb = gltf.scene;
+            handglb.scale.set(5, 5, 5);
+            handglb.position.set(1, 1,-5);
+            handglb.rotation.set(-1,-1,0);
+            scene.add(handglb);
+            reConfigureSlider("scale", handglb.scale, handglb.rotation, handglb.position);
+        });
+
+        let reticle;
+        loader.load("https://immersive-web.github.io/webxr-samples/media/gltf/reticle/reticle.gltf", function(gltf) {
+        reticle = gltf.scene;
+        //reticle.visible = false;
+        scene.add(reticle);
+        })
+
+        // add event listeners
+        // get option-value
+        document.getElementById('select-option').onchange = function() {
+            console.log('option: ', this.value);
+            soption = this.value;
+            let pos=handglb.position;
+            let scl=handglb.scale;
+            let rot=handglb.rotation;
+            console.log('scl: ', scl, 'rot: ', rot, 'pos: ', pos);
+            reConfigureSlider(soption, scl, rot, pos);
+        };
+        
+  
+
+
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.3);
+        directionalLight.position.set(10, 15, 10);
+        scene.add(directionalLight);
+
+        const renderer = new THREE.WebGLRenderer( { 
+            alpha: true,
+            preserveDrawingBuffer: true,
+            canvas: canvas,
+            context: gl
+        } );       
+        renderer.autoClear = false;
+        // The API directly updates the camera matrices.
+        // Disable matrix auto updates so three.js doesn't attempt
+        // to handle the matrices independently.
+        const camera = new THREE.PerspectiveCamera();
+        camera.matrixAutoUpdate = false;
+
+
+        
+        session.updateRenderState({
+            baseLayer: new XRWebGLLayer(session, gl)
+        });
+
+        // A 'local' reference space has a native origin that is located
+        // near the viewer's position at the time the session was created.
+        const referenceSpace = await session.requestReferenceSpace('local');
+
+        // Create another XRReferenceSpace that has the viewer as the origin.
+        const viewerSpace = await session.requestReferenceSpace('viewer');
+        // Perform hit testing using the viewer as origin.
+        const hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
+     
+
+        // Create a render loop that allows us to draw on the AR view.
+        const onXRFrame = (time, frame) => {
+            // Queue up the next draw request.
+            session.requestAnimationFrame(onXRFrame);
+           
+            // Bind the graphics framebuffer to the baseLayer's framebuffer
+            gl.bindFramebuffer(gl.FRAMEBUFFER, session.renderState.baseLayer.framebuffer)
+            
+            const pose = frame.getViewerPose(referenceSpace); 
+     
+                        
+            if (pose) {
+                // In mobile AR, we only have one view.
+                const view = pose.views[0];
+            
+                const viewport = session.renderState.baseLayer.getViewport(view);
+                renderer.setSize(viewport.width, viewport.height)
+            
+                // Use the view's transform matrix and projection matrix to configure the THREE.camera.
+                camera.matrix.fromArray(view.transform.matrix)
+                camera.projectionMatrix.fromArray(view.projectionMatrix);
+                camera.updateMatrixWorld(true);
+
+                const hitTestResults = frame.getHitTestResults(hitTestSource);
+                if (hitTestResults.length > 0 && reticle) {
+                  console.log('hitTestResults: ', hitTestResults);
+                  const hitPose = hitTestResults[0].getPose(referenceSpace);
+                  reticle.visible = true;
+                  reticle.position.set(hitPose.transform.position.x, hitPose.transform.position.y, hitPose.transform.position.z)
+                  reticle.updateMatrixWorld(true);
+                }
+
+                // Render the scene with THREE.WebGLRenderer.
+                renderer.render(scene, camera)
+            }
+
+        }
+        session.requestAnimationFrame(onXRFrame);
+
+        
+    }
+
+
+    // Define the event listener function
+    const inputHandler = (event) => {
+        const { target: { value } } = event;
+        console.log(`Burdan: ${event.target.id}: ${value}  option: ${soption}`);
+        document.getElementById(`${event.target.id}-value`).textContent = value; // Get the span element
+        handglb[soption].set(xSlider.value, ySlider.value, zSlider.value);
+        
+    };
+    // Add the event listener to all three sliders
+    [xSlider, ySlider, zSlider].forEach(slider => {
+        slider.addEventListener('input', inputHandler);
+    });
+
+
+
+
+
+    /*
+    xSlider.addEventListener('input', (event) => {
+        xValue.textContent = event.target.value;
+        console.log('x: ', event.target.value, 'option: ', soption);
+        reConfigureGlb(soption, handglb, xSlider, ySlider, zSlider);
+
+    });
+    ySlider.addEventListener('input', (event) => {
+        yValue.textContent = event.target.value;
+        console.log('y: ', event.target.value, 'option: ', soption);
+        reConfigureGlb(soption, handglb, xSlider, ySlider, zSlider);
+    });
+    zSlider.addEventListener('input', (event) => {
+        zValue.textContent = event.target.value;
+        console.log('z: ', event.target.value, 'option: ', soption);
+        reConfigureGlb(soption, handglb, xSlider, ySlider, zSlider);
+
+    });*/
+    
+
+</script>
+</body>
+</html>
